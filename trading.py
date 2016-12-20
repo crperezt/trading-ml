@@ -105,24 +105,12 @@ def run_models():
     dataset.loc[dataset.RETURN.astype(np.float64) >= 0.10, 'RETURN_CAT'] = np.str('plus_ten')
     dataset.loc[dataset.RETURN.astype(np.float64) <= -0.10, 'RETURN_CAT'] = np.str('minus_ten')
 
-    print "Number of stocks plus_five: "
-    print dataset[dataset['RETURN_CAT']=='plus_five'].count()[0]
-    print "Number of stocks minus_five: "
-    print dataset[dataset['RETURN_CAT']=='minus_five'].count()[0]
-    print "\nNumber of stocks plus_five_ten: "
-    print dataset[dataset['RETURN_CAT']=='plus_five_ten'].count()[0]
-    print "\nNumber of stocks minus_five_ten: "
-    print dataset[dataset['RETURN_CAT']=='minus_five_ten'].count()[0]
-    print "\nNumber of stocks plus_ten: "
+    print "\nNumber of stocks within 10 and -10 percent: "
+    print dataset[dataset['RETURN_CAT']=='within_ten'].count()[0]
+    print "\nNumber of stocks over 10 percent: "
     print dataset[dataset['RETURN_CAT']=='plus_ten'].count()[0]
-    print "\nNumber of stocks minus_ten: "
+    print "\nNumber of stocks under -10 percent: "
     print dataset[dataset['RETURN_CAT']=='minus_ten'].count()[0]
-
-    dataset.to_csv('full_data.csv')
-
-    #print "printing return col!"
-    #print dataset.loc[dataset.RETURN.dtype != np.float64].head()
-
 
     #Extract the feature and target columns
     feature_cols = list(dataset.columns[:-2])
