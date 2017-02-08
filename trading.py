@@ -14,6 +14,8 @@ from sklearn.model_selection import cross_val_score
 from sklearn.externals import joblib
 from sklearn.ensemble import AdaBoostClassifier
 from sklearn.ensemble import VotingClassifier
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.gaussian_process import GaussianProcessClassifier
 
 def preprocess_features(X):
 	output = pd.DataFrame(index = X.index)
@@ -82,7 +84,7 @@ def run_models():
     type_list.extend([('NBV' + str(i), np.float64) for i in range(1,13)])
     type_dict = dict(type_list)
 
-    dataset = pd.read_csv("dataset3.csv")
+    dataset = pd.read_csv("dataset_norm_sector.csv")
     print "Data read successfully."
 
     #Cleanup data
@@ -91,22 +93,51 @@ def run_models():
     dataset.dropna(axis=0, inplace=True)
     #dataset = dataset.drop(['COMPANY','NBC1','NBC2','NBC3','NBC4','NBC5','NBC6','NBV1','NBV2','NBV3','NBV4','NBV5','NBV6'], axis=1)
     dataset = dataset.drop(['COMPANY'], axis=1)
-    dataset = dataset.drop(['MKTCAP'], axis=1)
-    dataset = dataset.drop(['SECTOR'], axis=1)
-    #dataset['MKTCAP'].replace('.*Small.', 'small', inplace=True, regex=True)
-    #dataset['MKTCAP'].replace('.*Mid.', 'mid', inplace=True, regex=True)
-    #dataset['MKTCAP'].replace('.*Large.', 'large', inplace=True, regex=True)
+    #dataset = dataset.drop(['MKTCAP'], axis=1)
+    #dataset = dataset.drop(['SECTOR'], axis=1)
+    dataset['MKTCAP'].replace('.*Small.', 'small', inplace=True, regex=True)
+    dataset['MKTCAP'].replace('.*Mid.', 'mid', inplace=True, regex=True)
+    dataset['MKTCAP'].replace('.*Large.', 'large', inplace=True, regex=True)
 
-    # dataset.loc[(dataset.RETURN.astype(np.float64) > 0.0) & (dataset.RETURN.astype(np.float64) < 0.05), 'RETURN_CAT'] = np.str('plus_five')
-    # dataset.loc[(dataset.RETURN.astype(np.float64) > -0.05) & (dataset.RETURN.astype(np.float64) <= 0.0), 'RETURN_CAT'] = np.str('minus_five')
-    # dataset.loc[(dataset.RETURN.astype(np.float64) >= 0.05) & (dataset.RETURN.astype(np.float64) < 0.10), 'RETURN_CAT'] = np.str('plus_five_ten')
-    # dataset.loc[(dataset.RETURN.astype(np.float64) <= -0.05) & (dataset.RETURN.astype(np.float64) > -0.10), 'RETURN_CAT'] = np.str('minus_five_ten')
-    dataset.loc[(dataset.RETURN.astype(np.float64) > -0.10) & (dataset.RETURN.astype(np.float64) < 0.10), 'RETURN_CAT'] = np.str('within_ten')
-    dataset.loc[dataset.RETURN.astype(np.float64) >= 0.10, 'RETURN_CAT'] = np.str('plus_ten')
-    dataset.loc[dataset.RETURN.astype(np.float64) <= -0.10, 'RETURN_CAT'] = np.str('minus_ten')
+    #Print dataset statistics
+    ret_data = dataset['RETURN'].apply(pd.to_numeric, errors='coerce')
+    min_return = np.min(ret_data)
+    max_return = np.max(ret_data)
+    mean_return = np.mean(ret_data)
+    median_return = np.median(ret_data)
+    std_return = np.std(ret_data)
+    first_quartile = np.percentile(ret_data,25)
+    third_quartile = np.percentile(ret_data,75)
 
-    print "\nNumber of stocks within 10 and -10 percent: "
-    print dataset[dataset['RETURN_CAT']=='within_ten'].count()[0]
+    print "Min return: " + str(min_return) + '\n'
+    print "Max return: " + str(max_return) + '\n'
+    print "Mean return: " + str(mean_return) + '\n'
+    print "Median return: " + str(median_return) + '\n'
+    print "Std Dev of return: " + str(std_return) + '\n'
+    print "First quartile: " + str(first_quartile) + '\n'
+    print "Third quartile: " + str(third_quartile) + '\n'
+    return
+
+    #Convert return data into categories
+    dataset.loc[(dataset.RETURN.astype(np.float64) > 0.0) & (dataset.RETURN.astype(np.float64) < 0.02), 'RETURN_CAT'] = np.str('plus_five')
+    dataset.loc[(dataset.RETURN.astype(np.float64) > -0.02) & (dataset.RETURN.astype(np.float64) <= 0.0), 'RETURN_CAT'] = np.str('minus_five')
+    dataset.loc[(dataset.RETURN.astype(np.float64) >= 0.02) & (dataset.RETURN.astype(np.float64) < 0.06), 'RETURN_CAT'] = np.str('plus_five_ten')
+    dataset.loc[(dataset.RETURN.astype(np.float64) > -0.06) & (dataset.RETURN.astype(np.float64) <= -0.02), 'RETURN_CAT'] = np.str('minus_five_ten')
+    dataset.loc[(dataset.RETURN.astype(np.float64) >= 0.06), 'RETURN_CAT'] = np.str('plus_ten')
+    dataset.loc[(dataset.RETURN.astype(np.float64) <= -0.06), 'RETURN_CAT'] = np.str('minus_ten')
+
+    #dataset.loc[(dataset.RETURN.astype(np.float64) > -0.07) & (dataset.RETURN.astype(np.float64) < 0.07), 'RETURN_CAT'] = np.str('within_seven')
+    #dataset.loc[dataset.RETURN.astype(np.float64) >= 0.07, 'RETURN_CAT'] = np.str('plus_seven')
+    #dataset.loc[dataset.RETURN.astype(np.float64) <= -0.07, 'RETURN_CAT'] = np.str('minus_seven')
+
+    print "\nNumber of stocks between 0 and 5 percent: "
+    print dataset[dataset['RETURN_CAT']=='plus_five'].count()[0]
+    print "\nNumber of stocks between -5 and 0 percent: "
+    print dataset[dataset['RETURN_CAT']=='minus_five'].count()[0]
+    print "\nNumber of stocks between 5 and 10 percent: "
+    print dataset[dataset['RETURN_CAT']=='plus_five_ten'].count()[0]
+    print "\nNumber of stocks between -10 and -5 percent: "
+    print dataset[dataset['RETURN_CAT']=='minus_five_ten'].count()[0]
     print "\nNumber of stocks over 10 percent: "
     print dataset[dataset['RETURN_CAT']=='plus_ten'].count()[0]
     print "\nNumber of stocks under -10 percent: "
@@ -125,13 +156,13 @@ def run_models():
     y_all = dataset[target_col]
 
     X_all = preprocess_features(X_all)
-    #print "Processed feature columns ({} total features):\n{}".format(len(X_all.columns), list(X_all.columns))
+    print "Processed feature columns ({} total features):\n{}".format(len(X_all.columns), list(X_all.columns))
 
 
 
 
     # TODO: Set the number of training points
-    num_train = 70000
+    num_train = 50000
 
     # Set the number of testing points
     num_test = X_all.shape[0] - num_train
@@ -152,22 +183,23 @@ def run_models():
     y_weights.loc[y_weights == 'plus_five_ten'] = 4
     y_weights.loc[y_weights == 'minus_five_ten'] = 4
 
-    params={'C': [1000]}
+    params={'C': [100]}
     #fit_params = {'sample_weight': y_weights}
     #fit_params = {'sample_weight': y_weights}
     #clf_A = naive_bayes.GaussianNB()
-    clf_svm = svm.SVC(C=1000, random_state = 2, cache_size=1000)
+    clf_A = svm.SVC(C=100, random_state = 2, cache_size=1000)
+    #clf_A = KNeighborsClassifier(n_neighbors=3, metric='minkowski', p=3, weights='distance')
     #clf_B = AdaBoostClassifier(base_estimator=clf_svm, random_state=2)
     #clf_C = RandomForestClassifier(random_state = 2)
-    
+    #clf_gp = GaussianProcessClassifier(random_state = 2)
 
     start = time()
     #best_param, best_estimator = train_classifierGS(clf_B, X_all, y_all, params)
     #predict_labels(best_estimator, X_test, y_test)
-    train_classifier(clf_svm,X_train,y_train,X_test,y_test)
+    train_classifier(clf_A,X_train,y_train,X_test,y_test)
     end = time()
     print "Trained in {:.4f} seconds.".format(end - start)
-    joblib.dump(clf_svm, 'svm_model2.pkl')
+    joblib.dump(clf_A, 'svm_model1_norm_sector.pkl')
 
 if __name__ == "__main__":
     run_models()
