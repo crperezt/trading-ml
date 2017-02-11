@@ -116,7 +116,6 @@ def run_models():
     print "Std Dev of return: " + str(std_return) + '\n'
     print "First quartile: " + str(first_quartile) + '\n'
     print "Third quartile: " + str(third_quartile) + '\n'
-    return
 
     #Convert return data into categories
     dataset.loc[(dataset.RETURN.astype(np.float64) > 0.0) & (dataset.RETURN.astype(np.float64) < 0.02), 'RETURN_CAT'] = np.str('plus_five')
