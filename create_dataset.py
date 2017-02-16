@@ -8,7 +8,6 @@ import errno
 from bs4 import BeautifulSoup
 from config import FORMS_DATA_PATH
 import pandas as pd
-from yahoo_finance import Share
 import sys
 
 
