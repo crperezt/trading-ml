@@ -9,13 +9,20 @@ from bs4 import BeautifulSoup
 from config import FORMS_DATA_PATH
 import pandas as pd
 import sys
+import urllib2
+import time
 
 
 class SecCrawler():
 
     def __init__(self):
         self.hello = "Welcome to Sec Crawler!"
-    
+        self.company_list = pd.read_csv('company_list.csv')
+        self.sector_dict = {'Consumer Discretionary': 'xly', 'Consumer Staples': 'xlp', \
+                            'Energy': 'xle', 'Financials': 'xlf', 'Health Care': 'xlv', \
+                            'Industrials': 'xli', 'Information Technology': 'xlk',      \
+                            'Materials': 'xlb', 'Real Estate': 'xlre',                  \
+                            'Telecommunication Services': 'xlt', 'Utilities': 'xlu'}
     #def parse_form4(self, company_code, start_date, end_date):
     def parse_form4(self, start_date, end_date, returns=False):
         #start_date, end_date in YYYY-MM format
@@ -28,7 +35,7 @@ class SecCrawler():
         
         #get list of all companies in SEC data directory
         #company_list = [f for f in listdir(DEFAULT_DATA_PATH) if isdir(join(DEFAULT_DATA_PATH,f))]
-        company_list = pd.read_csv(join(FORMS_DATA_PATH, 'company_list.csv'))
+        company_list = pd.read_csv('company_list.csv')
 
         #generate list of months to include in data
         start_month = int(start_date[5:7])
@@ -48,12 +55,15 @@ class SecCrawler():
             start_month = start_month + 1 if start_month != 12 else 1
         date_set.sort()
 
-        dataset_file = open(join(FORMS_DATA_PATH, 'picks_dataset.csv'), 'a+')
-        dataset_file.write('COMPANY,NBC1,NBC2,NBC3,NBC4,NBC5,NBC6,NBC7,NBC8,NBC9,NBC10,NBC11,NBC12,NBV1,NBV2,NBV3,NBV4,NBV5,NBV6,NBV7,NBV8,NBV9,NBV10,NBV11,NBV12,SECTOR,MKTCAP,RETURN\n')
+        dataset_file = open('dataset_6_12_spy.csv', 'a+')
+        dataset_file.write('COMPANY,MONTH,NBC1,NBC2,NBC3,NBC4,NBC5,NBC6,NBC7,NBC8,NBC9,NBC10,NBC11,NBC12,NBV1,NBV2,NBV3,NBV4,NBV5,NBV6,NBV7,NBV8,NBV9,NBV10,NBV11,NBV12,SECTOR,MKTCAP,RET1,RET6,RET12\n')
         
         #for each company c directory
         #traverse through all downloaded files
         for i, c in enumerate(company_list.SYMBOL):
+
+
+            #self.ret_frame = pd.read_json("https://api.tiingo.com/tiingo/daily/" + c.lower() + "/prices?startDate=2011-01-01&endDate=2016-12-31&token=8a387055f2f4081b89abfc6b3044284e958f178e")
             print "Processing " + c + ". Company " + str(i) + " of " + str(len(company_list.SYMBOL))
             cpath = join(FORMS_DATA_PATH, c, c, 'form4')
             csector = company_list.SECTOR[i]
@@ -77,20 +87,40 @@ class SecCrawler():
                 #print join(cpath,f)
 
                 soup = BeautifulSoup(form.read(), 'lxml-xml')
-                #find all transactions in file
+                #find all non-derivative transactions in file
                 for t in soup.find_all('nonDerivativeTransaction'):
                     t_date = t.transactionDate.value.string[0:7]
                     if t_date not in date_set:
                         #print "Date out of range!"
                         continue
-                    num_shares = int(float(t.transactionShares.value.string))
-                    if t.transactionAcquiredDisposedCode.value.string == 'A':
-                        company_data[t_date]['sb'] = company_data[t_date]['sb'] + num_shares
-                        company_data[t_date]['purch'] = company_data[t_date]['purch'] + 1
-                    elif t.transactionAcquiredDisposedCode.value.string == 'D':
-                        company_data[t_date]['ss'] = company_data[t_date]['sb'] + num_shares
-                        company_data[t_date]['sales'] = company_data[t_date]['sales'] + 1
+                    #some transactions are in fractions, so need to convert to
+                    #float then int
+                    if t.transactionShares:
+                        num_shares = int(float(t.transactionShares.value.string))
+                        if t.transactionAcquiredDisposedCode.value.string == 'A':
+                            company_data[t_date]['sb'] = company_data[t_date]['sb'] + num_shares
+                            company_data[t_date]['purch'] = company_data[t_date]['purch'] + 1
+                        elif t.transactionAcquiredDisposedCode.value.string == 'D':
+                            company_data[t_date]['ss'] = company_data[t_date]['sb'] + num_shares
+                            company_data[t_date]['sales'] = company_data[t_date]['sales'] + 1
        
+                ##### This block includes transactions of derivatives in dataset
+                # for t in soup.find_all('derivativeTransaction'):
+                #     t_date = t.transactionDate.value.string[0:7]
+                #     if t_date not in date_set:
+                #         #print "Date out of range!"
+                #         continue
+                #     if t.transactionShares:
+                #         num_shares = int(float(t.transactionShares.value.string))
+                #         if t.transactionAcquiredDisposedCode.value.string == 'A':
+                #             company_data[t_date]['sb'] = company_data[t_date]['sb'] + num_shares
+                #             company_data[t_date]['purch'] = company_data[t_date]['purch'] + 1
+                #         elif t.transactionAcquiredDisposedCode.value.string == 'D':
+                #             company_data[t_date]['ss'] = company_data[t_date]['sb'] + num_shares
+                #             company_data[t_date]['sales'] = company_data[t_date]['sales'] + 1
+
+
+
             #sort the dictionary by date for dataset
             #to add return data for 12-month segments
             sorted_cd = company_data.items()
@@ -100,22 +130,19 @@ class SecCrawler():
             #create dataset for company c
             #for each month, form tuple with data of next 11 months
             #and form a datapoint
-            #dataset_file.write('COMPANY,NBC,NBV,SECTOR,MKTCAP,RETURN\n')
             for j, cd in enumerate(sorted_cd):
                 #if there are no 12 consecutive months after this month
                 #finish
                 if j + 12 > len(sorted_cd):
                     break
-                #if this month has no trades, skip
-                #if sorted_cd[j][1]['purch'] == 0 and sorted_cd[j][1]['sales'] == 0:
-                #    continue
 
-                
-                dataset_file.write(c + ',')
+                #write company ticker and month of first month in seq (j)
+                dataset_file.write(c + ',' + sorted_cd[j][0] + ',')
                 nbc = []
                 nbv = []
                 for k in range (j,j+12):
                     #print "Computing stats for " + c + " for month " + str(sorted_cd[k][0])
+                    
                     try:
                         nbc_k = float(sorted_cd[k][1]['purch'] - sorted_cd[k][1]['sales'])/float(sorted_cd[k][1]['purch'] + sorted_cd[k][1]['sales'])                      
                     except ZeroDivisionError:
@@ -136,8 +163,8 @@ class SecCrawler():
 
                 #fetch return for month 13
                 if returns:
-                    ret = self.get_return_13(c, sorted_cd[j][0])
-                    dataset_file.write(str(csector) + ',' + str(cmktcap) + ',' + str(ret) + '\n')
+                    ret = self.get_return_13(c, sorted_cd[j][0], csector)
+                    dataset_file.write(str(csector) + ',' + str(cmktcap) + ',' + str(ret[0]) + ',' + str(ret[1]) + ',' + str(ret[2]) + '\n')
                 else:
                     dataset_file.write(str(csector) + ',' + str(cmktcap) + '\n')
 
@@ -145,7 +172,7 @@ class SecCrawler():
             
 
 
-    def get_return_13(self, company, month):
+    def get_return_13(self, company, month, csector):
 
         month_int = int(month[5:7])
         month_first = month + '-01'
@@ -155,33 +182,104 @@ class SecCrawler():
 
         month_last = month + '-' + last_days[month_int]
 
-        #stock = Share(company)
+        sector_ticker = self.sector_dict[csector]
+        #print "Fetching return data for sector index: " + sector_ticker + '\n'
+
+        month6_int = month_int + 5
+        if month6_int > 12:
+            month6_int = month6_int - 12
+            year6_int = int(month[0:4]) + 1
+        else:
+            year6_int = int(month[0:4])
+
+        month12_int = month_int + 11
+        year12_int = int(month[0:4])
+        if month12_int > 12:
+            month12_int = month12_int - 12
+            year12_int = int(month[0:4]) + 1
+        else:
+            year12_int = int(month[0:4])
+        month6_str = str(month6_int) if month6_int > 9 else '0' + str(month6_int)
+        month12_str = str(month12_int) if month12_int > 9 else '0' + str(month12_int)
+
+        month_last_6 = str(year6_int) + '-' + month6_str + '-' + last_days[month6_int]
+        month_last_12 = str(year12_int) + '-' + month12_str + '-' + last_days[month12_int]
+
+        # print "Month of return: " + month + '\n'
+        # print "First of month: " + month_first + '\n'
+        # print "Last of month: " + month_last + '\n'
+        # print "Last of 6 months: " + month_last_6 + '\n'
+        # print "Last of 12 months: " + month_last_12 + '\n'
+
+
+        price_list = []
+        ret_list = []
+        spy_ret_list = []
         for attempts in range (20):
             try:
-                ret_list = pd.read_json("https://api.tiingo.com/tiingo/daily/" + company.lower() + "/prices?startDate=" + month_first + "&endDate=" + month_last + "&token=8a387055f2f4081b89abfc6b3044284e958f178e")
-            except:
-                typ, value, traceback = sys.exc_info()
-                print "Could not retrieve stock data\n" 
-                print str(typ)
-                print str(value)
-                print "\n Retrying..."    
+                ret_list.append(pd.read_json("https://api.tiingo.com/tiingo/daily/" + company.lower() + "/prices?startDate=" + month_first + "&endDate=" + month_last + "&token=8a387055f2f4081b89abfc6b3044284e958f178e"))
+                spy_ret_list.append(pd.read_json("https://api.tiingo.com/tiingo/daily/spy/prices?startDate=" + month_first + "&endDate=" + month_last + "&token=8a387055f2f4081b89abfc6b3044284e958f178e"))
+                ret_list.append(pd.read_json("https://api.tiingo.com/tiingo/daily/" + company.lower() + "/prices?startDate=" + month_first + "&endDate=" + month_last_6 + "&token=8a387055f2f4081b89abfc6b3044284e958f178e"))
+                spy_ret_list.append(pd.read_json("https://api.tiingo.com/tiingo/daily/spy/prices?startDate=" + month_first + "&endDate=" + month_last_6 + "&token=8a387055f2f4081b89abfc6b3044284e958f178e"))
+                ret_list.append(pd.read_json("https://api.tiingo.com/tiingo/daily/" + company.lower() + "/prices?startDate=" + month_first + "&endDate=" + month_last_12 + "&token=8a387055f2f4081b89abfc6b3044284e958f178e"))
+                spy_ret_list.append(pd.read_json("https://api.tiingo.com/tiingo/daily/spy/prices?startDate=" + month_first + "&endDate=" + month_last_12 + "&token=8a387055f2f4081b89abfc6b3044284e958f178e"))
+            except urllib2.HTTPError as err:
+                if err.code == 429:
+                    print "429 HTTP Error, sleeping for 21 minutes..."
+                    time.sleep(1260)
+                    print "Back online"
+                elif err.code == 404:
+                    print "Error 404, data unavailable, skipping...\n"
+                    return 'Fail'
+                else:
+                    typ, value, traceback = sys.exc_info()
+                    print "Could not retrieve stock data\n" 
+                    print str(typ)
+                    print str(value)
+                    print "\n Retrying. Attempt " + str(attempts)    
             else:
                 break
             finally:
                 if attempts == 19:
                     print "Failed to fetch stock data\n"
-                    return 'Fail'
+                    return ['Fail','Fail','Fail']
 
 
         #print ret_list.head()
         #print ret_list.tail()
+        ret = []
         try:
-            ret = (float(ret_list.adjClose[len(ret_list)-1]) - float(ret_list.adjClose[0]))/float(ret_list.adjClose[0])
+            price_rel_1 = float(ret_list[0].adjClose[0])/float(spy_ret_list[0].adjClose[0])
+            price_rel_30 = float(ret_list[0].adjClose[len(ret_list[0])-1])/float(spy_ret_list[0].adjClose[len(spy_ret_list[0])-1])
+            ret.append((float(price_rel_30) - float(price_rel_1))/float(price_rel_1))
+
+
+            price_rel_6mo = float(ret_list[1].adjClose[len(ret_list[1])-1])/float(spy_ret_list[1].adjClose[len(spy_ret_list[1])-1])
+            ret.append((float(price_rel_6mo) - float(price_rel_1))/float(price_rel_1))
+
+            price_rel_12mo = float(ret_list[2].adjClose[len(ret_list[2])-1])/float(spy_ret_list[2].adjClose[len(spy_ret_list[2])-1])
+            ret.append((float(price_rel_12mo) - float(price_rel_1))/float(price_rel_1))
         except:
-            ret = 'None'
+            ret.append('None')
+            ret.append('None')
+            ret.append('None')
+
         return ret
+
+    def find_empty(self):
+        el = []
+        for i, c in enumerate(self.company_list.SYMBOL):
+            cpath = join(FORMS_DATA_PATH, c, c, 'form4')
+            file_list = [f for f in listdir(cpath)]
+            ef = open('empty_folders.txt','a+')
+
+            if not file_list:
+                el.append(c)
+                ef.write(c + '\n')
+        print 'Number of empty folders: ' + str(len(el))
+                
 
 if __name__ == '__main__':
     s = SecCrawler()
-    s.parse_form4('2015-12', '2016-11')
+    s.parse_form4('2010-01', '2016-12',returns=True)
 

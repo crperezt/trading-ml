@@ -6,7 +6,7 @@ import requests
 import os
 import errno
 from bs4 import BeautifulSoup
-from config import FORMS_DATA_PATH
+from config import FORMS_DATA_PATH, HTTP_TIMEOUT
 import urllib2
 
 
@@ -38,7 +38,7 @@ class SecCrawler():
             base_url = doc_list[j]
             for a in range(self.max_attempts):
                 try:
-                    r = requests.get(base_url, timeout=5)
+                    r = requests.get(base_url, timeout=HTTP_TIMEOUT)
                     data = r.text
                     path = os.path.join(FORMS_DATA_PATH, company_code, cik,
                     filing_type, doc_name_list[j])
@@ -65,6 +65,13 @@ class SecCrawler():
                         print str(typ)
                         print str(value)
                         print "\n Retrying. Attempt " + str(a)
+                except requests.exceptions.Timeout as e:
+                    print e
+                    print "HTTP Read timeout on doc list, retry number " + str(a)
+                except urllib3.exceptions.ConnectTimeoutError:
+                	print "HTTP Connections to EDGAR exceeded. Sleeping for 11 minutes..."
+                	time.sleep(660)
+                	print "Back online"
                 else:
                     break
                 finally:
@@ -90,7 +97,7 @@ class SecCrawler():
             print ("Fetching doc list for " + str(company_code))
             for attempts in range(self.max_attempts):
                 try:
-                    r = requests.get(base_url, timeout=5)
+                    r = requests.get(base_url, timeout=HTTP_TIMEOUT)
                 #except requests.exceptions.ReadTimeout:
                 except urllib2.HTTPError as err:
                     if err.code == 429:
@@ -110,6 +117,13 @@ class SecCrawler():
                         print str(typ)
                         print str(value)
                         print "\n Retrying. Attempt " + str(attempts)
+                except requests.exceptions.Timeout as e:
+                    print e
+                    print "HTTP Read timeout, retry number " + str(attempts)
+                except urllib3.exceptions.ConnectTimeoutError:
+                	print "HTTP Connections to EDGAR exceeded. Sleeping for 11 minutes..."
+                	time.sleep(660)
+                	print "Back online"
                 else:
                     break
                 finally: 

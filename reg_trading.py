@@ -83,7 +83,7 @@ def run_models():
     #type_list.extend([('NBV' + str(i), np.float64) for i in range(1,13)])
     #type_dict = dict(type_list)
 
-    dataset = pd.read_csv("dataset.csv")
+    dataset = pd.read_csv("dataset_norm_sector.csv")
     print "Data read successfully."
 
     #Cleanup data
@@ -104,7 +104,7 @@ def run_models():
     dataset.loc[dataset.RETURN.astype(np.float64) <= -0.10, 'RETURN_CAT'] = np.str('minus_ten')
 
 
-    dataset.to_csv('full_data.csv')
+    #dataset.to_csv('full_data.csv')
 
     #print "printing return col!"
     #print dataset.loc[dataset.RETURN.dtype != np.float64].head()
@@ -141,14 +141,15 @@ def run_models():
     #params={'C': [10, 100, 1000]}
     #fit_params = {'sample_weight': y_weights}
     #fit_params = {'sample_weight': y_weights}
-    clf_A = GradientBoostingRegressor()
+    #reg_A = GradientBoostingRegressor()
     #params = None
-    params={'max_depth': [10, 100, 1000, 8000]}
-    #clf_B = svm.SVR(cache_size=1000)
+    #params={'max_depth': [10, 100, 1000, 8000]}
+    params={'C': [10, 100, 1000, 8000]}
+    reg_A = svm.SVR(cache_size=1000)
     #clf_C = RandomForestClassifier(random_state = 2)
 
     start = time()
-    best_param, best_estimator = train_classifierGS(clf_A, X_train, y_train, params)
+    best_param, best_estimator = train_classifierGS(reg_A, X_train, y_train, params)
     predict_labels(best_estimator, X_test, y_test)
     #train_classifier(clf_B,X_train,y_train,X_test,y_test)
     end = time()
