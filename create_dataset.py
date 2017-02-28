@@ -8,6 +8,7 @@ import errno
 from bs4 import BeautifulSoup
 from config import FORMS_DATA_PATH
 import pandas as pd
+import numpy as np
 import sys
 import urllib2
 import time
@@ -23,8 +24,11 @@ class SecCrawler():
                             'Industrials': 'xli', 'Information Technology': 'xlk',      \
                             'Materials': 'xlb', 'Real Estate': 'xlre',                  \
                             'Telecommunication Services': 'xlt', 'Utilities': 'xlu'}
+        self.ret_frame = pd.DataFrame()
+        self.spy_ret_frame = pd.DataFrame()
+        self.last_date = ''
     #def parse_form4(self, company_code, start_date, end_date):
-    def parse_form4(self, start_date, end_date, returns=False):
+    def parse_form4(self, start_date, end_date, returns=True):
         #start_date, end_date in YYYY-MM format
         #Iterate through files for company
         #Calculate monthly NBC, NBV from start_date to end_date
@@ -36,6 +40,8 @@ class SecCrawler():
         #get list of all companies in SEC data directory
         #company_list = [f for f in listdir(DEFAULT_DATA_PATH) if isdir(join(DEFAULT_DATA_PATH,f))]
         company_list = pd.read_csv('company_list.csv')
+        self.spy_ret_frame = pd.read_json("https://api.tiingo.com/tiingo/daily/spy/prices?startDate=" + start_date + "&endDate=" + end_date + "&token=8a387055f2f4081b89abfc6b3044284e958f178e")
+        self.last_date = end_date
 
         #generate list of months to include in data
         start_month = int(start_date[5:7])
@@ -61,10 +67,13 @@ class SecCrawler():
         #for each company c directory
         #traverse through all downloaded files
         for i, c in enumerate(company_list.SYMBOL):
-
-
-            #self.ret_frame = pd.read_json("https://api.tiingo.com/tiingo/daily/" + c.lower() + "/prices?startDate=2011-01-01&endDate=2016-12-31&token=8a387055f2f4081b89abfc6b3044284e958f178e")
+            
             print "Processing " + c + ". Company " + str(i) + " of " + str(len(company_list.SYMBOL))
+
+            if self.pull_returns(c) == False:
+                "Failed to fetch return data for " + c + ", skipping..."
+                continue
+
             cpath = join(FORMS_DATA_PATH, c, c, 'form4')
             csector = company_list.SECTOR[i]
             cmktcap = company_list.MKTCAP[i]
@@ -133,7 +142,7 @@ class SecCrawler():
             for j, cd in enumerate(sorted_cd):
                 #if there are no 12 consecutive months after this month
                 #finish
-                if j + 12 > len(sorted_cd):
+                if j + 13 > len(sorted_cd):
                     break
 
                 #write company ticker and month of first month in seq (j)
@@ -163,13 +172,40 @@ class SecCrawler():
 
                 #fetch return for month 13
                 if returns:
-                    ret = self.get_return_13(c, sorted_cd[j][0], csector)
+                    ret = self.get_return_13(c, sorted_cd[j+12][0], csector)
                     dataset_file.write(str(csector) + ',' + str(cmktcap) + ',' + str(ret[0]) + ',' + str(ret[1]) + ',' + str(ret[2]) + '\n')
                 else:
                     dataset_file.write(str(csector) + ',' + str(cmktcap) + '\n')
 
         dataset_file.close()
             
+
+
+    def pull_returns(self, c):
+        for attempts in range (20):
+            try:
+                self.ret_frame = pd.read_json("https://api.tiingo.com/tiingo/daily/" + c.lower() + "/prices?startDate=2011-01-01&endDate=2016-12-31&token=8a387055f2f4081b89abfc6b3044284e958f178e")
+            except urllib2.HTTPError as err:
+                if err.code == 429:
+                    print "429 HTTP Error, sleeping for 21 minutes..."
+                    time.sleep(1260)
+                    print "Back online"
+                elif err.code == 404:
+                    print "Error 404, data unavailable, skipping...\n"
+                    return False
+                else:
+                    typ, value, traceback = sys.exc_info()
+                    print "Could not retrieve stock data\n" 
+                    print str(typ)
+                    print str(value)
+                    print "\n Retrying. Attempt " + str(attempts)    
+            else:
+                return True
+            finally:
+                if attempts == 19:
+                    print "Failed to fetch stock data\n"
+                    return False
+        
 
 
     def get_return_13(self, company, month, csector):
@@ -212,57 +248,35 @@ class SecCrawler():
         # print "Last of 12 months: " + month_last_12 + '\n'
 
 
-        price_list = []
         ret_list = []
         spy_ret_list = []
-        for attempts in range (20):
-            try:
-                ret_list.append(pd.read_json("https://api.tiingo.com/tiingo/daily/" + company.lower() + "/prices?startDate=" + month_first + "&endDate=" + month_last + "&token=8a387055f2f4081b89abfc6b3044284e958f178e"))
-                spy_ret_list.append(pd.read_json("https://api.tiingo.com/tiingo/daily/spy/prices?startDate=" + month_first + "&endDate=" + month_last + "&token=8a387055f2f4081b89abfc6b3044284e958f178e"))
-                ret_list.append(pd.read_json("https://api.tiingo.com/tiingo/daily/" + company.lower() + "/prices?startDate=" + month_first + "&endDate=" + month_last_6 + "&token=8a387055f2f4081b89abfc6b3044284e958f178e"))
-                spy_ret_list.append(pd.read_json("https://api.tiingo.com/tiingo/daily/spy/prices?startDate=" + month_first + "&endDate=" + month_last_6 + "&token=8a387055f2f4081b89abfc6b3044284e958f178e"))
-                ret_list.append(pd.read_json("https://api.tiingo.com/tiingo/daily/" + company.lower() + "/prices?startDate=" + month_first + "&endDate=" + month_last_12 + "&token=8a387055f2f4081b89abfc6b3044284e958f178e"))
-                spy_ret_list.append(pd.read_json("https://api.tiingo.com/tiingo/daily/spy/prices?startDate=" + month_first + "&endDate=" + month_last_12 + "&token=8a387055f2f4081b89abfc6b3044284e958f178e"))
-            except urllib2.HTTPError as err:
-                if err.code == 429:
-                    print "429 HTTP Error, sleeping for 21 minutes..."
-                    time.sleep(1260)
-                    print "Back online"
-                elif err.code == 404:
-                    print "Error 404, data unavailable, skipping...\n"
-                    return 'Fail'
-                else:
-                    typ, value, traceback = sys.exc_info()
-                    print "Could not retrieve stock data\n" 
-                    print str(typ)
-                    print str(value)
-                    print "\n Retrying. Attempt " + str(attempts)    
-            else:
-                break
-            finally:
-                if attempts == 19:
-                    print "Failed to fetch stock data\n"
-                    return ['Fail','Fail','Fail']
+        ret_list.append(self.ret_frame[(self.ret_frame.date >= month_first) & (self.ret_frame.date <= month_last)])
+        spy_ret_list.append(self.spy_ret_frame[(self.spy_ret_frame.date >= month_first) & (self.spy_ret_frame.date <= month_last)])
+        ret_list.append(self.ret_frame[(self.ret_frame.date >= month_first) & (self.ret_frame.date <= month_last_6)])
+        spy_ret_list.append(self.spy_ret_frame[(self.spy_ret_frame.date >= month_first) & (self.spy_ret_frame.date <= month_last_6)])
+        ret_list.append(self.ret_frame[(self.ret_frame.date >= month_first) & (self.ret_frame.date <= month_last_12)])
+        spy_ret_list.append(self.spy_ret_frame[(self.spy_ret_frame.date >= month_first) & (self.spy_ret_frame.date <= month_last_12)])
 
-
-        #print ret_list.head()
-        #print ret_list.tail()
         ret = []
+
         try:
-            price_rel_1 = float(ret_list[0].adjClose[0])/float(spy_ret_list[0].adjClose[0])
-            price_rel_30 = float(ret_list[0].adjClose[len(ret_list[0])-1])/float(spy_ret_list[0].adjClose[len(spy_ret_list[0])-1])
+            price_rel_1 = float(ret_list[0].adjClose[ret_list[0].first_valid_index()])/float(spy_ret_list[0].adjClose[spy_ret_list[0].first_valid_index()])
+            price_rel_30 = float(ret_list[0].adjClose[ret_list[0].last_valid_index()])/float(spy_ret_list[0].adjClose[spy_ret_list[0].last_valid_index()])
             ret.append((float(price_rel_30) - float(price_rel_1))/float(price_rel_1))
 
+            if np.str(ret_list[1].date[ret_list[1].last_valid_index()])[0:10] <= self.last_date:
+                price_rel_6mo = float(ret_list[1].adjClose[ret_list[1].last_valid_index()])/float(spy_ret_list[1].adjClose[spy_ret_list[1].last_valid_index()])
+                ret.append((float(price_rel_6mo) - float(price_rel_1))/float(price_rel_1))
+            else:
+                ret.append('None')
 
-            price_rel_6mo = float(ret_list[1].adjClose[len(ret_list[1])-1])/float(spy_ret_list[1].adjClose[len(spy_ret_list[1])-1])
-            ret.append((float(price_rel_6mo) - float(price_rel_1))/float(price_rel_1))
-
-            price_rel_12mo = float(ret_list[2].adjClose[len(ret_list[2])-1])/float(spy_ret_list[2].adjClose[len(spy_ret_list[2])-1])
-            ret.append((float(price_rel_12mo) - float(price_rel_1))/float(price_rel_1))
+            if np.str(ret_list[2].date[ret_list[2].last_valid_index()])[0:10] <= self.last_date:
+                price_rel_12mo = float(ret_list[2].adjClose[ret_list[2].last_valid_index()])/float(spy_ret_list[2].adjClose[spy_ret_list[2].last_valid_index()])
+                ret.append((float(price_rel_12mo) - float(price_rel_1))/float(price_rel_1))
+            else:
+                ret.append('None')
         except:
-            ret.append('None')
-            ret.append('None')
-            ret.append('None')
+            return ['None','None','None']
 
         return ret
 
@@ -281,5 +295,5 @@ class SecCrawler():
 
 if __name__ == '__main__':
     s = SecCrawler()
-    s.parse_form4('2010-01', '2016-12',returns=True)
+    s.parse_form4('2010-01-01', '2016-12-31',returns=True)
 
