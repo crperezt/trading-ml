@@ -42,6 +42,7 @@ class SecCrawler():
         company_list = pd.read_csv('company_list.csv')
         self.spy_ret_frame = pd.read_json("https://api.tiingo.com/tiingo/daily/spy/prices?startDate=" + start_date + "&endDate=" + end_date + "&token=8a387055f2f4081b89abfc6b3044284e958f178e")
         self.last_date = end_date
+        #self.last_date = str(int(end_date[0:4]) - 1) + end_date[4:]
 
         #generate list of months to include in data
         start_month = int(start_date[5:7])
@@ -98,7 +99,10 @@ class SecCrawler():
                 soup = BeautifulSoup(form.read(), 'lxml-xml')
                 #find all non-derivative transactions in file
                 for t in soup.find_all('nonDerivativeTransaction'):
-                    t_date = t.transactionDate.value.string[0:7]
+                    try:
+                        t_date = t.transactionDate.value.string[0:7]
+                    except:
+                        continue
                     if t_date not in date_set:
                         #print "Date out of range!"
                         continue
@@ -264,13 +268,15 @@ class SecCrawler():
             price_rel_30 = float(ret_list[0].adjClose[ret_list[0].last_valid_index()])/float(spy_ret_list[0].adjClose[spy_ret_list[0].last_valid_index()])
             ret.append((float(price_rel_30) - float(price_rel_1))/float(price_rel_1))
 
-            if np.str(ret_list[1].date[ret_list[1].last_valid_index()])[0:10] <= self.last_date:
+            #if np.str(ret_list[1].date[ret_list[1].last_valid_index()])[0:10] <= self.last_date:
+            if month_last_6 <= self.last_date[0:7]:
                 price_rel_6mo = float(ret_list[1].adjClose[ret_list[1].last_valid_index()])/float(spy_ret_list[1].adjClose[spy_ret_list[1].last_valid_index()])
                 ret.append((float(price_rel_6mo) - float(price_rel_1))/float(price_rel_1))
             else:
                 ret.append('None')
 
-            if np.str(ret_list[2].date[ret_list[2].last_valid_index()])[0:10] <= self.last_date:
+            #if np.str(ret_list[2].date[ret_list[2].last_valid_index()])[0:10] <= self.last_date:
+            if month_last_12 <= self.last_date[0:7]:
                 price_rel_12mo = float(ret_list[2].adjClose[ret_list[2].last_valid_index()])/float(spy_ret_list[2].adjClose[spy_ret_list[2].last_valid_index()])
                 ret.append((float(price_rel_12mo) - float(price_rel_1))/float(price_rel_1))
             else:
