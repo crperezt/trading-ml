@@ -87,7 +87,7 @@ def count_zeroes(x):
 
 def run_models():
 
-    dataset = pd.read_csv("dataset_6_12_spy.csv")
+    dataset = pd.read_csv("dataset_6_12_spy_alt_norm.csv")
     print "Data read successfully."
 
     #Cleanup data
@@ -167,7 +167,7 @@ def run_models():
     print "Processed feature columns ({} total features):\n{}".format(len(X_all.columns), list(X_all.columns))
 
     # TODO: Set the number of training points
-    num_train = 30000
+    num_train = 80000
 
     # Set the number of testing points
     num_test = X_all.shape[0] - num_train

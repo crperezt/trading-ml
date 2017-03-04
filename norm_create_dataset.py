@@ -183,18 +183,23 @@ class SecCrawler():
                 for k in range (j,j+12):
                     #print "Computing stats for " + c + " for month " + str(sorted_cd[k][0])
                     
-                    try:
-                        nbc_k = float(sorted_cd[k][1]['purch'] - sorted_cd[k][1]['sales'])/float(sorted_cd[k][1]['purch'] + sorted_cd[k][1]['sales'])                      
-                    except ZeroDivisionError:
-                        nbc.append(0.0)
-                    else:
-                        nbc.append(nbc_k)
-                    try:
-                        nbv_k = float(sorted_cd[k][1]['sb'] - sorted_cd[k][1]['ss'])/float(sorted_cd[k][1]['sb'] + sorted_cd[k][1]['ss']) 
-                    except ZeroDivisionError:
-                        nbv.append(0.0)
-                    else:
-                        nbv.append(nbv_k)
+                    nbc_k = float(sorted_cd[k][1]['purch'] - sorted_cd[k][1]['sales'])
+                    nbc.append(nbc_k)
+                    nbv_k = float(sorted_cd[k][1]['sb'] - sorted_cd[k][1]['ss'])
+                    nbv.append(nbv_k)
+
+                    # try:
+                    #     nbc_k = float(sorted_cd[k][1]['purch'] - sorted_cd[k][1]['sales'])/float(sorted_cd[k][1]['purch'] + sorted_cd[k][1]['sales'])                      
+                    # except ZeroDivisionError:
+                    #     nbc.append(0.0)
+                    # else:
+                    #     nbc.append(nbc_k)
+                    # try:
+                    #     nbv_k = float(sorted_cd[k][1]['sb'] - sorted_cd[k][1]['ss'])/float(sorted_cd[k][1]['sb'] + sorted_cd[k][1]['ss']) 
+                    # except ZeroDivisionError:
+                    #     nbv.append(0.0)
+                    # else:
+                    #     nbv.append(nbv_k)
                 
                 for n in nbc:
                     dataset_file.write(str(n) + ',')
