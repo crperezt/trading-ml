@@ -62,7 +62,7 @@ class SecCrawler():
             start_month = start_month + 1 if start_month != 12 else 1
         date_set.sort()
 
-        dataset_file = open('dataset_6_12_spy.csv', 'a+')
+        dataset_file = open('dataset_6_12_spy_alt_norm.csv', 'a+')
         dataset_file.write('COMPANY,MONTH,NBC1,NBC2,NBC3,NBC4,NBC5,NBC6,NBC7,NBC8,NBC9,NBC10,NBC11,NBC12,NBV1,NBV2,NBV3,NBV4,NBV5,NBV6,NBV7,NBV8,NBV9,NBV10,NBV11,NBV12,SECTOR,MKTCAP,RET1,RET6,RET12\n')
         
         #for each company c directory
@@ -140,6 +140,33 @@ class SecCrawler():
             sorted_cd.sort()
             #print "Sorted company data for " + c + "\n" + str(sorted_cd) + "\n"
 
+            
+            #Divide each quantity by the maximum quantity for the company throughout the dataset period
+            #e.g., total stocks bought for a month divided by the maximum amount of stock bought in any month for that company
+            max_purch = max([x[1]['purch'] for x in sorted_cd])
+            max_sales = max([x[1]['sales'] for x in sorted_cd])
+            max_sb = max([x[1]['sb'] for x in sorted_cd])
+            max_ss = max([x[1]['ss'] for x in sorted_cd])
+
+            for j, cd in enumerate(sorted_cd):
+                try:
+                    sorted_cd[j][1]['purch'] = sorted_cd[j][1]['purch']/float(max_purch)
+                except:
+                    pass
+                try:
+                    sorted_cd[j][1]['sales'] = sorted_cd[j][1]['sales']/float(max_sales)
+                except:
+                    pass
+                try:
+                    sorted_cd[j][1]['sb'] = sorted_cd[j][1]['sb']/float(max_sb)
+                except:
+                    pass
+                try:
+                    sorted_cd[j][1]['ss'] = sorted_cd[j][1]['ss']/float(max_ss)
+                except:
+                    pass
+
+
             #create dataset for company c
             #for each month, form tuple with data of next 11 months
             #and form a datapoint
@@ -156,18 +183,23 @@ class SecCrawler():
                 for k in range (j,j+12):
                     #print "Computing stats for " + c + " for month " + str(sorted_cd[k][0])
                     
-                    try:
-                        nbc_k = float(sorted_cd[k][1]['purch'] - sorted_cd[k][1]['sales'])/float(sorted_cd[k][1]['purch'] + sorted_cd[k][1]['sales'])                      
-                    except ZeroDivisionError:
-                        nbc.append(0.0)
-                    else:
-                        nbc.append(nbc_k)
-                    try:
-                        nbv_k = float(sorted_cd[k][1]['sb'] - sorted_cd[k][1]['ss'])/float(sorted_cd[k][1]['sb'] + sorted_cd[k][1]['ss']) 
-                    except ZeroDivisionError:
-                        nbv.append(0.0)
-                    else:
-                        nbv.append(nbv_k)
+                    nbc_k = float(sorted_cd[k][1]['purch'] - sorted_cd[k][1]['sales'])
+                    nbc.append(nbc_k)
+                    nbv_k = float(sorted_cd[k][1]['sb'] - sorted_cd[k][1]['ss'])
+                    nbv.append(nbv_k)
+
+                    # try:
+                    #     nbc_k = float(sorted_cd[k][1]['purch'] - sorted_cd[k][1]['sales'])/float(sorted_cd[k][1]['purch'] + sorted_cd[k][1]['sales'])                      
+                    # except ZeroDivisionError:
+                    #     nbc.append(0.0)
+                    # else:
+                    #     nbc.append(nbc_k)
+                    # try:
+                    #     nbv_k = float(sorted_cd[k][1]['sb'] - sorted_cd[k][1]['ss'])/float(sorted_cd[k][1]['sb'] + sorted_cd[k][1]['ss']) 
+                    # except ZeroDivisionError:
+                    #     nbv.append(0.0)
+                    # else:
+                    #     nbv.append(nbv_k)
                 
                 for n in nbc:
                     dataset_file.write(str(n) + ',')

@@ -13,6 +13,7 @@ from sklearn.cross_validation import ShuffleSplit
 from sklearn.model_selection import cross_val_score
 from sklearn.externals import joblib
 from sklearn.ensemble import AdaBoostClassifier
+from sklearn.ensemble import BaggingClassifier
 from sklearn.ensemble import VotingClassifier
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.gaussian_process import GaussianProcessClassifier
@@ -215,11 +216,12 @@ def run_models(regression=False):
     params={'C': [100]}
     #fit_params = {'sample_weight': y_weights}
     #fit_params = {'sample_weight': y_weights}
-    clf_A = naive_bayes.GaussianNB()
+    #clf_A = naive_bayes.GaussianNB()
     #clf_A = svm.SVC(C=10, random_state = 2, cache_size=1000)
     #clf_A = KNeighborsClassifier(n_neighbors=3, metric='minkowski', p=3, weights='distance')
-    #clf_B = AdaBoostClassifier(base_estimator=clf_svm, random_state=2)
-    #clf_C = RandomForestClassifier(random_state = 2)
+    #clf_A = AdaBoostClassifier(random_state=2)
+    clf_A = BaggingClassifier(n_estimators=10, max_samples=0.5, max_features=0.5, random_state=2)
+    #clf_A = RandomForestClassifier(random_state = 2)
     #clf_gp = GaussianProcessClassifier(random_state = 2)
 
     reg_A = svm.SVR(cache_size=1000)
@@ -235,7 +237,7 @@ def run_models(regression=False):
 
     end = time()
     print "Trained in {:.4f} seconds.".format(end - start)
-    joblib.dump(reg_A, 'nb_reg.pkl')
+    joblib.dump(clf_A, 'ensemble.pkl')
 
 if __name__ == "__main__":
-    run_models(regression=True)
+    run_models(regression=False)
