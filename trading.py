@@ -42,33 +42,34 @@ def train_reg(reg, X_train, y_train, X_test, y_test):
     predict_ret(reg,X_test, y_test)
 
 def train_classifier(clf, X_train, y_train, X_test, y_test, X_company, X_month, y_test_raw):
-    clf.fit(X_train, y_train) 
-    scoring_fnc = make_scorer(performance_metric)
-    predict_labels(clf,X_test, y_test)
-    prob_pos_clf = clf.predict_proba(X_test)[:,0]
 
-    #clf_isotonic = CalibratedClassifierCV(clf, cv=3, method='isotonic')
-    #clf_isotonic.fit(X_train, y_train)
-    #prob_pos_isotonic = clf_isotonic.predict_proba(X_test)[:, 1]
-    #predict_labels(clf_isotonic,X_test, y_test)
+    #prob_pos_clf = clf.predict_proba(X_test)[:,0]
+
+    clf.fit(X_train, y_train)
+    clf_iso = CalibratedClassifierCV(clf, cv='prefit', method='isotonic')
+    clf_iso.fit(X_train, y_train)
+    prob_pos_isotonic = clf_iso.predict_proba(X_test)[:, 1]
+    predict_labels(clf,X_test, y_test)
     
 
-    sorted_prob = zip(X_company,X_month,clf.predict(X_test),y_test,y_test_raw,prob_pos_clf)
-    #sorted_prob = zip(X_company,X_month,clf_isotonic.predict(X_test),y_test,y_test_raw,prob_pos_isotonic)
+    #sorted_prob = zip(X_company,X_month,clf.predict(X_test),y_test,y_test_raw,prob_pos_clf)
+    sorted_prob = zip(X_company,X_month,clf_iso.predict(X_test),y_test,y_test_raw,prob_pos_isotonic)
     sorted_prob_df = pd.DataFrame(sorted_prob)
-    print sorted_prob_df.head()
 
     sorted_prob_df.sort_values(5,ascending=False,inplace=True)
-    #print sorted_prob_df.head(200)
-    print sorted_prob_df[sorted_prob_df[2]=='f1'].head(15)
-    print sorted_prob_df[sorted_prob_df[2]=='f2'].head(15)
-    print sorted_prob_df[sorted_prob_df[2]=='f3'].head(15)
+    print sorted_prob_df.head(30)
+    #print sorted_prob_df[sorted_prob_df[2]=='f1'].head(15)
+    #print sorted_prob_df[sorted_prob_df[2]=='f2'].head(15)
+    #print sorted_prob_df[sorted_prob_df[2]=='f3'].head(15)
     #print sorted_prob_df[sorted_prob_df[2]=='f4'].head(15)
     print("Brier scores: (the smaller the better)")
-    clf_score = brier_score_loss(y_test, prob_pos_clf, pos_label='f1')
-    print("No calibration: %1.3f" % clf_score)
-    #clf_score = brier_score_loss(y_test, prob_pos_isotonic, pos_label='f1')
-    #print("Isotonic calibration: %1.3f" % clf_score)
+    #clf_score = brier_score_loss(y_test, prob_pos_clf, pos_label='UP' if alt_labels else 'ABOVE')
+    #print("No calibration: %1.3f" % clf_score)
+    clf_score = brier_score_loss(y_test, prob_pos_isotonic, pos_label='ABOVE')
+    print("Isotonic calibration: %1.3f" % clf_score)
+    predict_labels(clf_iso,X_test, y_test)
+
+    return clf_iso
 
 def train_classifierGS(clf, X_train, y_train, params=None):
     cv_iters = 2
@@ -103,7 +104,6 @@ def predict_labels(clf, features, target):
     # Start the clock, make predictions, then stop the clock
     start = time()
     y_pred = clf.predict(features)
-    pd.DataFrame(y_pred).to_csv('y_pred.csv')
     end = time()
     
     # Print and return results
@@ -131,7 +131,7 @@ def count_zeroes(x):
     return count
 
 
-def run_models(regression=False, bear=True):
+def run_models(regression=False, alt_labels=True):
 
     dataset = pd.read_csv("dataset.csv")
     print "Data read successfully."
@@ -200,33 +200,14 @@ def run_models(regression=False, bear=True):
         #Convert return data into categories
         y_raw = dataset['RET']
 
-        if bear:
-            dataset.loc[(dataset.RET.astype(np.float64) > f1) & (dataset.RET.astype(np.float64) < f2), 'RETURN_CAT'] = np.str('f2')
-            dataset.loc[(dataset.RET.astype(np.float64) <= f1), 'RETURN_CAT'] = np.str('f1')
-            dataset.loc[(dataset.RET.astype(np.float64) >= f2), 'RETURN_CAT'] = np.str('f3')
+        if alt_labels:
+            dataset.loc[(dataset.RET.astype(np.float64) > f1) & (dataset.RET.astype(np.float64) < f2), 'RETURN_CAT'] = np.str('STABLE')
+            dataset.loc[(dataset.RET.astype(np.float64) <= f1), 'RETURN_CAT'] = np.str('DOWN')
+            dataset.loc[(dataset.RET.astype(np.float64) >= f2), 'RETURN_CAT'] = np.str('UP')
         else:
-            dataset.loc[(dataset.RET.astype(np.float64) > f1) & (dataset.RET.astype(np.float64) < f2), 'RETURN_CAT'] = np.str('f2')
-            dataset.loc[(dataset.RET.astype(np.float64) <= f1), 'RETURN_CAT'] = np.str('f3')
-            dataset.loc[(dataset.RET.astype(np.float64) >= f2), 'RETURN_CAT'] = np.str('f1')
-
-        #dataset.loc[(dataset.RETURN.astype(np.float64) > -0.07) & (dataset.RETURN.astype(np.float64) < 0.07), 'RETURN_CAT'] = np.str('within_seven')
-        #dataset.loc[dataset.RETURN.astype(np.float64) >= 0.07, 'RETURN_CAT'] = np.str('plus_seven')
-        #dataset.loc[dataset.RETURN.astype(np.float64) <= -0.07, 'RETURN_CAT'] = np.str('minus_seven')
-
-        # print "\nNumber of stocks in middle: "
-        # print dataset[dataset['RETURN_CAT']=='middle'].count()[0]
-        # print "\nNumber of stocks above: "
-        # print dataset[dataset['RETURN_CAT']=='above'].count()[0]
-        # print "\nNumber of stocks below: "
-        # print dataset[dataset['RETURN_CAT']=='below'].count()[0]
-
-        print "\nNumber of stocks in f1: "
-        print dataset[dataset['RETURN_CAT']=='f1'].count()[0]
-        print "\nNumber of stocks f2: "
-        print dataset[dataset['RETURN_CAT']=='f2'].count()[0]
-        print "\nNumber of stocks f3: "
-        print dataset[dataset['RETURN_CAT']=='f3'].count()[0]
-
+            dataset.loc[(dataset.RET.astype(np.float64) > f1) & (dataset.RET.astype(np.float64) < f2), 'RETURN_CAT'] = np.str('MIDDLE')
+            dataset.loc[(dataset.RET.astype(np.float64) <= f1), 'RETURN_CAT'] = np.str('BELOW')
+            dataset.loc[(dataset.RET.astype(np.float64) >= f2), 'RETURN_CAT'] = np.str('ABOVE')
 
     #Extract the feature and target columns
     feature_cols = list(dataset.columns[:-2])
@@ -264,11 +245,11 @@ def run_models(regression=False, bear=True):
     
     #fit_params = {'sample_weight': y_weights}
     #fit_params = {'sample_weight': y_weights}
-    #clf_B = naive_bayes.GaussianNB()
+    clf_A = naive_bayes.GaussianNB()
     #clf_A = svm.SVC(C=10, random_state = 2, cache_size=1000)
     #clf_A = KNeighborsClassifier(n_neighbors=3, metric='minkowski', p=3, weights='distance')
     #clf_A = AdaBoostClassifier(clf_B,random_state=2)
-    clf_A = BaggingClassifier(clf_B, n_estimators=100, max_samples=0.3, max_features=0.3, random_state=2)
+    #clf_A = BaggingClassifier(clf_B, n_estimators=100, max_samples=0.3, max_features=0.3, random_state=2)
     #clf_A = RandomForestClassifier(random_state = 2)
     #clf_A = GaussianProcessClassifier(random_state = 2)
     #clf_A = LinearDiscriminantAnalysis()
@@ -280,21 +261,18 @@ def run_models(regression=False, bear=True):
     #predict_labels(best_estimator, X_test, y_test)
 
     if regression:
-        train_reg(reg_A,X_train,y_train,X_test,y_test)
+        clf = train_reg(reg_A,X_train,y_train,X_test,y_test)
     else:
-        train_classifier(clf_A,X_train,y_train,X_test,y_test,X_company,X_month,y_test_raw)
+        clf = train_classifier(clf_A,X_train,y_train,X_test,y_test,X_company,X_month,y_test_raw)
 
         #params={'n_estimators': [1,10,100,500,1000], 'max_samples': [0.3,0.5,1.0], 'max_features': [0.3,0.5,1.0]}
         #train_classifierGS(clf_A, X_train, y_train, params=params)
 
-    clf_A.fit(X_all,y_all)
+    #clf_A.fit(X_all,y_all)
     end = time()
     print "Trained in {:.4f} seconds.".format(end - start)
-    if bear:
-        class_pref = 'bear'
-    else:
-        class_pref = 'bull'
-    joblib.dump(clf_A, 'bagging_nb_3' + class_pref + '.pkl')
+
+    joblib.dump(clf, 'model.pkl')
 
 if __name__ == "__main__":
-    run_models(regression=False, bear=True)
+    run_models(regression=False, alt_labels=False)

@@ -152,7 +152,7 @@ def run_models(regression=False):
     X_all = preprocess_features(X_all)
     print "Processed feature columns ({} total features):\n{}".format(len(X_all.columns), list(X_all.columns))
 
-    clf = joblib.load('bagging_nb_bear_final.pkl')
+    clf = joblib.load('model.pkl')
 
     y_pred = clf.predict(X_all)
 
@@ -162,15 +162,12 @@ def run_models(regression=False):
     #results = rdf[rdf.category.astype(np.str)==np.str('minus_ten')]
     #print results
 
-
-    prob_above_clf = clf.predict_proba(X_all)[:,0]
-
-    sorted_prob = zip(X_company,clf.predict(X_all),prob_above_clf)
+    sorted_prob = zip(X_company,clf.predict(X_all),clf.predict_proba(X_all)[:,0])
     sorted_prob_df = pd.DataFrame(sorted_prob)
     print sorted_prob_df.head()
 
     sorted_prob_df.sort(2,ascending=False,inplace=True)
-    sorted_prob_df.to_csv('bear_picks.txt')
+    sorted_prob_df.to_csv('picks.txt')
 
 if __name__ == "__main__":
     run_models(regression=False)
